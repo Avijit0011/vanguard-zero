@@ -1,4 +1,4 @@
-// VANGUARD: ZERO 3D Game Engine Loop with 3D Gun Viewmodel, Bullet Tracers, and Bot AI
+// VANGUARD: ZERO 3D Game Engine Loop with Gun/Knife Switching, 5v5 Bot Match Mode, and Precision Bullet Tracers
 class VanguardGame {
     constructor() {
         this.canvas = document.getElementById('game-canvas');
@@ -19,9 +19,18 @@ class VanguardGame {
         this.armor = 50;
         this.playerCredits = 800;
         this.equippedHero = null;
-        this.equippedWeapon = window.WEAPONS_DATA[5]; // Aether V Rifle
-        this.currentAmmo = 25;
-        this.reserveAmmo = 75;
+
+        // Weapon Inventory Slots (1: Primary, 2: Secondary, 3: Melee Knife)
+        this.inventory = {
+            1: window.WEAPONS_DATA[5], // Aether V Assault Rifle
+            2: window.WEAPONS_DATA[1], // Venom-45 Heavy Pistol
+            3: window.WEAPONS_DATA[11] // Plasma Blade Knife
+        };
+        this.activeSlot = 1;
+        this.equippedWeapon = this.inventory[1];
+
+        this.currentAmmo = this.equippedWeapon.magazine;
+        this.reserveAmmo = this.equippedWeapon.reserve;
         this.isADS = false;
 
         // Input state
@@ -45,9 +54,9 @@ class VanguardGame {
         this.tracers = [];
         this.particles = [];
 
-        // Gun Recoil Animation State
-        this.gunRecoilOffset = new THREE.Vector3();
-        this.gunRecoilRot = new THREE.Vector3();
+        // Gun Recoil & Knife Slash Animation State
+        this.viewmodelOffset = new THREE.Vector3();
+        this.viewmodelRot = new THREE.Vector3();
 
         this.initEngine();
     }
@@ -69,8 +78,8 @@ class VanguardGame {
         // Build 3D Map
         this.mapSpawns = window.MapBuilder.buildNexusPrime(this.scene);
 
-        // Create 3D Gun Viewmodel attached to Camera
-        this.createGunViewModel();
+        // Create 3D Viewmodels (Gun & Knife)
+        this.createViewmodels();
 
         // Setup Pointer Lock & Controls
         this.canvas.addEventListener('click', () => {
@@ -89,6 +98,7 @@ class VanguardGame {
         document.addEventListener('keyup', (e) => this.handleKeyUp(e));
         document.addEventListener('mousedown', (e) => this.handleMouseDown(e));
         document.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+        document.addEventListener('wheel', (e) => this.handleMouseWheel(e));
 
         window.addEventListener('resize', () => {
             this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -101,16 +111,16 @@ class VanguardGame {
         requestAnimationFrame((t) => this.gameLoop(t));
     }
 
-    createGunViewModel() {
-        // Gun Viewmodel Container attached directly to Camera
-        this.gunContainer = new THREE.Group();
+    createViewmodels() {
+        this.viewmodelContainer = new THREE.Group();
 
-        // Gun Body / Receiver
+        // 1. GUN MESH (Rifle / Pistol)
+        this.gunGroup = new THREE.Group();
+
         const bodyGeo = new THREE.BoxGeometry(0.12, 0.16, 0.55);
         const gunMat = new THREE.MeshStandardMaterial({ color: 0x1a202c, metalness: 0.85, roughness: 0.2 });
         const body = new THREE.Mesh(bodyGeo, gunMat);
 
-        // Gun Barrel
         const barrelGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.4, 16);
         const barrelMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.1 });
         const barrel = new THREE.Mesh(barrelGeo, barrelMat);
@@ -118,28 +128,71 @@ class VanguardGame {
         barrel.position.set(0, 0.03, -0.4);
         body.add(barrel);
 
-        // Glowing Energy Optics / Sight Scope
         const sightGeo = new THREE.BoxGeometry(0.06, 0.06, 0.15);
         const sightMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x00f0ff, emissiveIntensity: 0.6 });
         const sight = new THREE.Mesh(sightGeo, sightMat);
         sight.position.set(0, 0.11, -0.05);
         body.add(sight);
 
-        // Muzzle Flash Light
         this.muzzleLight = new THREE.PointLight(0xffb703, 0, 8);
         this.muzzleLight.position.set(0, 0.03, -0.65);
         body.add(this.muzzleLight);
 
-        this.gunMesh = body;
-        this.gunContainer.add(this.gunMesh);
+        this.gunGroup.add(body);
+        this.viewmodelContainer.add(this.gunGroup);
 
-        // Position Gun in lower right FPS hipfire stance
-        this.gunDefaultPos = new THREE.Vector3(0.24, -0.22, -0.45);
-        this.gunADSPos = new THREE.Vector3(0, -0.11, -0.32);
-        this.gunContainer.position.copy(this.gunDefaultPos);
+        // 2. KNIFE MESH (Plasma Energy Blade)
+        this.knifeGroup = new THREE.Group();
 
-        this.camera.add(this.gunContainer);
+        const handleGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.22, 12);
+        const handleMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.7 });
+        const handle = new THREE.Mesh(handleGeo, handleMat);
+
+        const bladeGeo = new THREE.BoxGeometry(0.015, 0.35, 0.06);
+        const bladeMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x00f0ff, emissiveIntensity: 0.8, metalness: 0.9 });
+        const blade = new THREE.Mesh(bladeGeo, bladeMat);
+        blade.position.set(0, 0.25, 0);
+        handle.add(blade);
+
+        handle.rotation.x = Math.PI / 3;
+        handle.position.set(0, 0, 0);
+        this.knifeGroup.add(handle);
+        this.knifeGroup.visible = false;
+        this.viewmodelContainer.add(this.knifeGroup);
+
+        // Positions
+        this.viewmodelDefaultPos = new THREE.Vector3(0.24, -0.22, -0.45);
+        this.viewmodelADSPos = new THREE.Vector3(0, -0.11, -0.32);
+        this.viewmodelContainer.position.copy(this.viewmodelDefaultPos);
+
+        this.camera.add(this.viewmodelContainer);
         this.scene.add(this.camera);
+    }
+
+    switchSlot(slot) {
+        if (!this.inventory[slot]) return;
+        this.activeSlot = slot;
+        this.equippedWeapon = this.inventory[slot];
+        this.currentAmmo = this.equippedWeapon.magazine;
+        this.reserveAmmo = this.equippedWeapon.reserve;
+
+        // Toggle 3D Viewmodel Mesh
+        if (slot === 3) { // Knife
+            this.gunGroup.visible = false;
+            this.knifeGroup.visible = true;
+        } else {
+            this.gunGroup.visible = true;
+            this.knifeGroup.visible = false;
+        }
+
+        if (this.isADS) {
+            this.isADS = false;
+            document.getElementById('ads-overlay').classList.add('hidden');
+            this.camera.fov = 75;
+            this.camera.updateProjectionMatrix();
+        }
+
+        this.updateHUD();
     }
 
     startMatch(mode, hero) {
@@ -157,56 +210,71 @@ class VanguardGame {
     }
 
     spawnBots() {
-        // Clear old bots
+        // Clear previous bots
         this.bots.forEach(b => this.scene.remove(b.group));
         this.bots = [];
 
-        // Create 5 Red Enemy Bots & 4 Allied Cyan Bots
-        const enemySpawnPositions = [
+        // 5 Red Enemy Bots (Defenders) & 4 Cyan Allied Bots (Attackers)
+        const redSpawns = [
             new THREE.Vector3(-35, 1.2, -30), // Site A
             new THREE.Vector3(35, 1.2, -30),  // Site B
-            new THREE.Vector3(0, 1.2, -10),   // Mid Choke
-            new THREE.Vector3(-15, 1.2, -20), // A Short
-            new THREE.Vector3(20, 1.2, -25)   // B Short
+            new THREE.Vector3(0, 1.2, -10),   // Mid
+            new THREE.Vector3(-18, 1.2, -15), // A Short
+            new THREE.Vector3(18, 1.2, -15)   // B Short
         ];
 
-        enemySpawnPositions.forEach((pos, idx) => {
-            const botGroup = new THREE.Group();
+        const cyanSpawns = [
+            new THREE.Vector3(-8, 1.2, 45),
+            new THREE.Vector3(8, 1.2, 45),
+            new THREE.Vector3(-20, 1.2, 35),
+            new THREE.Vector3(20, 1.2, 35)
+        ];
 
-            // Tactical Bot Body
-            const bodyGeo = new THREE.CapsuleGeometry(0.45, 1.1, 8, 16);
-            const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff2a5f, roughness: 0.4 });
-            const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
-            botGroup.add(bodyMesh);
+        // Red Enemies
+        redSpawns.forEach((pos, idx) => {
+            this.createBotEntity(`ENEMY_BOT_${idx + 1}`, 'Red', 0xff2a5f, pos);
+        });
 
-            // Tactical Helmet / Visor
-            const headGeo = new THREE.SphereGeometry(0.32, 16, 16);
-            const visorMat = new THREE.MeshStandardMaterial({ color: 0xffb703, emissive: 0xffb703, emissiveIntensity: 0.5 });
-            const headMesh = new THREE.Mesh(headGeo, visorMat);
-            headMesh.position.set(0, 0.75, 0.1);
-            botGroup.add(headMesh);
+        // Cyan Allies
+        cyanSpawns.forEach((pos, idx) => {
+            this.createBotEntity(`ALLY_BOT_${idx + 1}`, 'Cyan', 0x00f0ff, pos);
+        });
+    }
 
-            // Enemy Weapon Model in hands
-            const weaponGeo = new THREE.BoxGeometry(0.1, 0.1, 0.6);
-            const weaponMat = new THREE.MeshStandardMaterial({ color: 0x111827 });
-            const weaponMesh = new THREE.Mesh(weaponGeo, weaponMat);
-            weaponMesh.position.set(0.3, 0.2, -0.3);
-            botGroup.add(weaponMesh);
+    createBotEntity(id, team, colorHex, pos) {
+        const botGroup = new THREE.Group();
 
-            botGroup.position.copy(pos);
-            this.scene.add(botGroup);
+        const bodyGeo = new THREE.CapsuleGeometry(0.45, 1.1, 8, 16);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4 });
+        const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+        botGroup.add(bodyMesh);
 
-            this.bots.push({
-                id: `ENEMY_BOT_${idx + 1}`,
-                team: 'Red',
-                group: botGroup,
-                hitMesh: bodyMesh,
-                health: 100,
-                armor: 50,
-                pos: botGroup.position,
-                lastShotTime: 0,
-                moveTarget: pos.clone()
-            });
+        const headGeo = new THREE.SphereGeometry(0.32, 16, 16);
+        const visorMat = new THREE.MeshStandardMaterial({ color: 0xffb703, emissive: 0xffb703, emissiveIntensity: 0.5 });
+        const headMesh = new THREE.Mesh(headGeo, visorMat);
+        headMesh.position.set(0, 0.75, 0.1);
+        botGroup.add(headMesh);
+
+        const weaponGeo = new THREE.BoxGeometry(0.1, 0.1, 0.6);
+        const weaponMat = new THREE.MeshStandardMaterial({ color: 0x111827 });
+        const weaponMesh = new THREE.Mesh(weaponGeo, weaponMat);
+        weaponMesh.position.set(0.3, 0.2, -0.3);
+        botGroup.add(weaponMesh);
+
+        botGroup.position.copy(pos);
+        this.scene.add(botGroup);
+
+        this.bots.push({
+            id,
+            team,
+            colorHex,
+            group: botGroup,
+            hitMesh: bodyMesh,
+            health: 100,
+            armor: 50,
+            pos: botGroup.position,
+            lastShotTime: 0,
+            moveTarget: pos.clone()
         });
     }
 
@@ -224,6 +292,11 @@ class VanguardGame {
 
     handleKeyDown(e) {
         this.keys[e.code] = true;
+
+        // Weapon Slot Switching Hotkeys
+        if (e.code === 'Digit1') this.switchSlot(1);
+        if (e.code === 'Digit2') this.switchSlot(2);
+        if (e.code === 'Digit3') this.switchSlot(3);
 
         if (e.code === 'KeyB') {
             window.uiManager.toggleBuyMenu(document.getElementById('buy-menu').classList.contains('hidden'));
@@ -250,11 +323,24 @@ class VanguardGame {
         }
     }
 
+    handleMouseWheel(e) {
+        if (!this.isPointerLocked) return;
+        if (e.deltaY > 0) {
+            let nextSlot = this.activeSlot + 1;
+            if (nextSlot > 3) nextSlot = 1;
+            this.switchSlot(nextSlot);
+        } else if (e.deltaY < 0) {
+            let prevSlot = this.activeSlot - 1;
+            if (prevSlot < 1) prevSlot = 3;
+            this.switchSlot(prevSlot);
+        }
+    }
+
     handleMouseDown(e) {
         if (!this.isPointerLocked) return;
         if (e.button === 0) { // Primary Attack
             this.shootWeapon();
-        } else if (e.button === 2) { // Secondary Attack (ADS Zoom)
+        } else if (e.button === 2 && this.activeSlot !== 3) { // Secondary ADS (Gun only)
             this.isADS = true;
             document.getElementById('ads-overlay').classList.remove('hidden');
             this.camera.fov = 45;
@@ -281,6 +367,32 @@ class VanguardGame {
     }
 
     shootWeapon() {
+        // Knife Melee Attack
+        if (this.activeSlot === 3) {
+            this.viewmodelRot.x = 0.4;
+            this.viewmodelOffset.z = 0.15;
+            if (window.soundEngine) window.soundEngine.playFootstep('metal');
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+            const hits = raycaster.intersectObjects(this.scene.children, true);
+
+            if (hits.length > 0 && hits[0].distance < 3.5) {
+                const targetBot = this.bots.find(b => b.team === 'Red' && (b.hitMesh === hits[0].object || b.group.children.includes(hits[0].object)));
+                if (targetBot && targetBot.health > 0) {
+                    targetBot.health -= 50;
+                    this.createImpactSparks(hits[0].point, 0xff2a5f);
+                    if (targetBot.health <= 0) {
+                        this.scene.remove(targetBot.group);
+                        window.uiManager.addKillfeedEntry('YOU', 'PLASMA BLADE', targetBot.id, false);
+                        this.playerCredits += 200;
+                    }
+                }
+            }
+            return;
+        }
+
+        // Gun Attack
         if (this.currentAmmo <= 0) return;
         this.currentAmmo--;
 
@@ -288,22 +400,20 @@ class VanguardGame {
             window.soundEngine.playGunshot(this.equippedWeapon.category.toLowerCase());
         }
 
-        // Recoil Kickback Animation on 3D Gun Viewmodel
-        this.gunRecoilOffset.z = 0.08;
-        this.gunRecoilRot.x = 0.12;
+        // Viewmodel Recoil Kickback
+        this.viewmodelOffset.z = 0.08;
+        this.viewmodelRot.x = 0.12;
 
         // Flash Muzzle Light
         this.muzzleLight.intensity = 3.0;
         setTimeout(() => this.muzzleLight.intensity = 0, 40);
 
-        // Calculate Bullet Fire Direction
+        // Raycast Hitscan
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
-
-        const botMeshes = this.bots.map(b => b.hitMesh);
         const hits = raycaster.intersectObjects(this.scene.children, true);
 
-        // Muzzle World Position
+        // Calculate Precise Muzzle World Position
         const muzzlePos = new THREE.Vector3();
         this.muzzleLight.getWorldPosition(muzzlePos);
 
@@ -312,11 +422,9 @@ class VanguardGame {
         let isHeadshot = false;
 
         for (let i = 0; i < hits.length; i++) {
-            if (hits[i].object !== this.gunMesh && !hits[i].object.ancestorsOf(this.gunContainer)) {
+            if (hits[i].object !== this.gunMesh && !hits[i].object.ancestorsOf(this.viewmodelContainer)) {
                 targetPos = hits[i].point;
-
-                // Check if hit enemy bot
-                const hitBot = this.bots.find(b => b.hitMesh === hits[i].object || b.group.children.includes(hits[i].object));
+                const hitBot = this.bots.find(b => b.team === 'Red' && (b.hitMesh === hits[i].object || b.group.children.includes(hits[i].object)));
                 if (hitBot) {
                     hitTarget = hitBot;
                     isHeadshot = targetPos.y > (hitBot.pos.y + 0.5);
@@ -325,10 +433,10 @@ class VanguardGame {
             }
         }
 
-        // Create Glowing Bullet Tracer
+        // Create PERFECT PROPER BULLET TRACER cylinder along ray path
         this.createBulletTracer(muzzlePos, targetPos, 0x00f0ff);
 
-        // Process Damage if Enemy Hit
+        // Apply Damage if Enemy Hit
         if (hitTarget && hitTarget.health > 0) {
             const damage = isHeadshot ? Math.round(this.equippedWeapon.damage * this.equippedWeapon.headshotMult) : this.equippedWeapon.damage;
             hitTarget.health -= damage;
@@ -337,7 +445,6 @@ class VanguardGame {
                 window.soundEngine.playHeadshotPing();
             }
 
-            // Create Impact Particle Effect
             this.createImpactSparks(targetPos, 0xff2a5f);
 
             if (hitTarget.health <= 0) {
@@ -353,19 +460,21 @@ class VanguardGame {
     }
 
     createBulletTracer(from, to, colorHex) {
-        const distance = from.distanceTo(to);
-        const tracerGeo = new THREE.CylinderGeometry(0.015, 0.015, distance, 8);
+        // Compute exact beam direction and distance
+        const direction = new THREE.Vector3().subVectors(to, from);
+        const distance = direction.length();
+        if (distance < 0.1) return;
+
+        const tracerGeo = new THREE.CylinderGeometry(0.02, 0.02, distance, 8);
+        tracerGeo.translate(0, distance / 2, 0); // Align origin to base of cylinder
         const tracerMat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.95 });
         const tracer = new THREE.Mesh(tracerGeo, tracerMat);
 
-        // Position & Orient Tracer Cylinder
-        const midPoint = from.clone().add(to).multiplyScalar(0.5);
-        tracer.position.copy(midPoint);
-        tracer.lookAt(to);
-        tracer.rotation.x += Math.PI / 2;
+        tracer.position.copy(from);
+        tracer.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize());
 
         this.scene.add(tracer);
-        this.tracers.push({ mesh: tracer, opacity: 0.95, createdAt: performance.now() });
+        this.tracers.push({ mesh: tracer, opacity: 0.95 });
     }
 
     createImpactSparks(pos, colorHex) {
@@ -387,6 +496,7 @@ class VanguardGame {
     }
 
     reload() {
+        if (this.activeSlot === 3) return; // Cannot reload knife
         this.currentAmmo = this.equippedWeapon.magazine;
         this.updateHUD();
     }
@@ -394,9 +504,12 @@ class VanguardGame {
     buyWeapon(weapon) {
         if (this.playerCredits >= weapon.cost) {
             this.playerCredits -= weapon.cost;
-            this.equippedWeapon = weapon;
-            this.currentAmmo = weapon.magazine;
-            this.reserveAmmo = weapon.reserve;
+            if (weapon.category === 'Pistol') {
+                this.inventory[2] = weapon;
+            } else if (weapon.category !== 'Melee') {
+                this.inventory[1] = weapon;
+                this.switchSlot(1);
+            }
             this.updateHUD();
             return true;
         }
@@ -408,7 +521,7 @@ class VanguardGame {
         this.lastTime = timestamp;
 
         this.updatePlayerMovement(delta);
-        this.updateGunViewmodel(delta);
+        this.updateViewmodel(delta);
         this.updateBotAI(delta, timestamp);
         this.updateTracersAndParticles(delta);
         this.updateTimers(delta);
@@ -418,49 +531,75 @@ class VanguardGame {
         requestAnimationFrame((t) => this.gameLoop(t));
     }
 
-    updateGunViewmodel(delta) {
-        // Smoothly interpolate gun viewmodel stance (ADS vs Hipfire)
-        const targetPos = this.isADS ? this.gunADSPos : this.gunDefaultPos;
-        this.gunContainer.position.lerp(targetPos.clone().add(this.gunRecoilOffset), delta * 15);
+    updateViewmodel(delta) {
+        const targetPos = (this.isADS && this.activeSlot !== 3) ? this.viewmodelADSPos : this.viewmodelDefaultPos;
+        this.viewmodelContainer.position.lerp(targetPos.clone().add(this.viewmodelOffset), delta * 15);
 
-        // Smoothly recover gun recoil offset & rotation
-        this.gunRecoilOffset.lerp(new THREE.Vector3(), delta * 12);
-        this.gunRecoilRot.lerp(new THREE.Vector3(), delta * 12);
+        this.viewmodelOffset.lerp(new THREE.Vector3(), delta * 12);
+        this.viewmodelRot.lerp(new THREE.Vector3(), delta * 12);
 
-        this.gunMesh.rotation.x = this.gunRecoilRot.x;
+        this.viewmodelContainer.rotation.x = this.viewmodelRot.x;
     }
 
     updateBotAI(delta, timestamp) {
-        // Update Bot AI (Navigation, Shooting Back, Line of Sight)
-        this.bots.forEach(bot => {
-            if (bot.health <= 0) return;
+        // Bot Team vs Team Combat Engine
+        const redBots = this.bots.filter(b => b.team === 'Red' && b.health > 0);
+        const cyanBots = this.bots.filter(b => b.team === 'Cyan' && b.health > 0);
 
-            // Check distance to player
+        // Update Red Enemy Bots
+        redBots.forEach(bot => {
+            // Check Player distance
             const distToPlayer = bot.pos.distanceTo(this.playerPos);
 
-            // Orient bot toward player if within vision radius (35m)
             if (distToPlayer < 35) {
                 bot.group.lookAt(this.playerPos.x, bot.pos.y, this.playerPos.z);
 
-                // Bot Shoot Back Logic (Fires every 1.2 seconds)
-                if (timestamp - bot.lastShotTime > 1200) {
+                if (timestamp - bot.lastShotTime > 1100) {
                     bot.lastShotTime = timestamp;
 
-                    // Bot Tracer
                     const botMuzzle = bot.pos.clone().add(new THREE.Vector3(0, 0.4, 0));
                     this.createBulletTracer(botMuzzle, this.playerPos.clone().add(new THREE.Vector3(0, -0.3, 0)), 0xff2a5f);
 
-                    if (window.soundEngine) {
-                        window.soundEngine.playGunshot('rifle');
-                    }
+                    if (window.soundEngine) window.soundEngine.playGunshot('rifle');
 
-                    // Damage Player if close
-                    if (distToPlayer < 25 && Math.random() < 0.45) {
-                        this.health = Math.max(0, this.health - 18);
+                    if (distToPlayer < 25 && Math.random() < 0.4) {
+                        this.health = Math.max(0, this.health - 16);
                         this.updateHUD();
                         if (this.health <= 0) {
                             window.uiManager.addKillfeedEntry(bot.id, 'AETHER V', 'YOU', false);
                         }
+                    }
+                }
+            } else if (cyanBots.length > 0) { // Fight Allied Bots if player not in range
+                const targetAlly = cyanBots[0];
+                bot.group.lookAt(targetAlly.pos.x, bot.pos.y, targetAlly.pos.z);
+                if (timestamp - bot.lastShotTime > 1400) {
+                    bot.lastShotTime = timestamp;
+                    const botMuzzle = bot.pos.clone().add(new THREE.Vector3(0, 0.4, 0));
+                    this.createBulletTracer(botMuzzle, targetAlly.pos, 0xff2a5f);
+                    targetAlly.health -= 25;
+                    if (targetAlly.health <= 0) {
+                        this.scene.remove(targetAlly.group);
+                        window.uiManager.addKillfeedEntry(bot.id, 'AETHER V', targetAlly.id, false);
+                    }
+                }
+            }
+        });
+
+        // Update Cyan Allied Bots
+        cyanBots.forEach(bot => {
+            if (redBots.length > 0) {
+                const targetRed = redBots[0];
+                bot.group.lookAt(targetRed.pos.x, bot.pos.y, targetRed.pos.z);
+
+                if (timestamp - bot.lastShotTime > 1300) {
+                    bot.lastShotTime = timestamp;
+                    const botMuzzle = bot.pos.clone().add(new THREE.Vector3(0, 0.4, 0));
+                    this.createBulletTracer(botMuzzle, targetRed.pos, 0x00f0ff);
+                    targetRed.health -= 30;
+                    if (targetRed.health <= 0) {
+                        this.scene.remove(targetRed.group);
+                        window.uiManager.addKillfeedEntry(bot.id, 'AETHER V', targetRed.id, false);
                     }
                 }
             }
@@ -468,10 +607,9 @@ class VanguardGame {
     }
 
     updateTracersAndParticles(delta) {
-        // Update Bullet Tracers Fade Out
         for (let i = this.tracers.length - 1; i >= 0; i--) {
             const t = this.tracers[i];
-            t.opacity -= delta * 4;
+            t.opacity -= delta * 5;
             if (t.opacity <= 0) {
                 this.scene.remove(t.mesh);
                 this.tracers.splice(i, 1);
@@ -480,7 +618,6 @@ class VanguardGame {
             }
         }
 
-        // Update Particle Sparks Physics
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
             p.mesh.position.addScaledVector(p.velocity, delta);
@@ -495,7 +632,10 @@ class VanguardGame {
     updatePlayerMovement(delta) {
         if (!this.isPointerLocked) return;
 
-        const moveSpeed = this.keys['KeyW'] || this.keys['KeyS'] || this.keys['KeyA'] || this.keys['KeyD'] ? 8.0 : 0;
+        // Fast Knife Sprint Speed (10.0 u/s) vs Gun Speed (7.5 u/s)
+        const baseSpeed = (this.activeSlot === 3) ? 10.5 : 7.5;
+        const moveSpeed = (this.keys['KeyW'] || this.keys['KeyS'] || this.keys['KeyA'] || this.keys['KeyD']) ? baseSpeed : 0;
+
         const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
         forward.y = 0;
         forward.normalize();
@@ -580,8 +720,14 @@ class VanguardGame {
         document.getElementById('hud-health-val').innerText = Math.max(0, this.health);
         document.getElementById('hud-health-fill').style.width = `${this.health}%`;
         document.getElementById('hud-weapon-name').innerText = this.equippedWeapon.name.toUpperCase();
-        document.getElementById('hud-ammo-current').innerText = this.currentAmmo;
-        document.getElementById('hud-ammo-reserve').innerText = this.reserveAmmo;
+
+        if (this.activeSlot === 3) {
+            document.getElementById('hud-ammo-current').innerText = '∞';
+            document.getElementById('hud-ammo-reserve').innerText = 'MELEE';
+        } else {
+            document.getElementById('hud-ammo-current').innerText = this.currentAmmo;
+            document.getElementById('hud-ammo-reserve').innerText = this.reserveAmmo;
+        }
 
         const abilContainer = document.getElementById('hud-abilities-container');
         if (abilContainer && this.equippedHero) {
@@ -604,7 +750,7 @@ class VanguardGame {
         ctx.fillStyle = '#101726';
         ctx.fillRect(0, 0, 160, 160);
 
-        // Site A
+        // Sites
         ctx.fillStyle = 'rgba(255, 183, 3, 0.4)';
         ctx.beginPath();
         ctx.arc(30, 40, 15, 0, Math.PI * 2);
@@ -612,7 +758,6 @@ class VanguardGame {
         ctx.fillStyle = '#ffb703';
         ctx.fillText('A', 26, 44);
 
-        // Site B
         ctx.fillStyle = 'rgba(0, 240, 255, 0.4)';
         ctx.beginPath();
         ctx.arc(130, 40, 15, 0, Math.PI * 2);
@@ -620,12 +765,12 @@ class VanguardGame {
         ctx.fillStyle = '#00f0ff';
         ctx.fillText('B', 126, 44);
 
-        // Enemy Bot Markers (Red)
+        // Bot Markers
         this.bots.forEach(bot => {
             if (bot.health > 0) {
                 const bx = 80 + (bot.pos.x * 0.8);
                 const bz = 80 + (bot.pos.z * 0.8);
-                ctx.fillStyle = '#ff2a5f';
+                ctx.fillStyle = bot.colorHex === 0xff2a5f ? '#ff2a5f' : '#00f0ff';
                 ctx.beginPath();
                 ctx.arc(bx, bz, 4, 0, Math.PI * 2);
                 ctx.fill();
@@ -643,7 +788,6 @@ class VanguardGame {
     }
 }
 
-// Add helper method to THREE Object3D prototype for traversal checks
 THREE.Object3D.prototype.ancestorsOf = function(object) {
     let curr = object;
     while (curr) {
