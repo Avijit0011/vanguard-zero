@@ -2,9 +2,16 @@
 class UIManager {
     constructor() {
         this.activeTab = 'play';
-        this.selectedHero = window.HEROES_DATA[0]; // Default Nyx
-        this.selectedWeapon = window.WEAPONS_DATA[5]; // Default Aether V Rifle
+        this.selectedHero = (window.HEROES_DATA && window.HEROES_DATA.length > 0) ? window.HEROES_DATA[0] : null;
+        this.selectedWeapon = (window.WEAPONS_DATA && window.WEAPONS_DATA.length > 5) ? window.WEAPONS_DATA[5] : null;
+    }
+
+    init() {
         this.initEventListeners();
+        this.renderHeroSelector();
+        this.renderHeroesTab();
+        this.renderArsenalTab();
+        this.renderBuyMenu();
     }
 
     initEventListeners() {
@@ -34,8 +41,10 @@ class UIManager {
         const btnLock = document.getElementById('btn-lock-pointer');
         if (btnLock) {
             btnLock.addEventListener('click', () => {
-                document.getElementById('click-to-play-banner').classList.add('hidden');
-                document.getElementById('game-canvas').requestPointerLock();
+                const promptBanner = document.getElementById('click-to-play-banner');
+                if (promptBanner) promptBanner.classList.add('hidden');
+                const canvas = document.getElementById('game-canvas');
+                if (canvas) canvas.requestPointerLock();
             });
         }
 
@@ -43,7 +52,8 @@ class UIManager {
         const sensInput = document.getElementById('setting-sens');
         if (sensInput) {
             sensInput.addEventListener('input', (e) => {
-                document.getElementById('sens-val').innerText = e.target.value;
+                const valEl = document.getElementById('sens-val');
+                if (valEl) valEl.innerText = e.target.value;
                 if (window.gameInstance) {
                     window.gameInstance.mouseSensitivity = parseFloat(e.target.value);
                 }
@@ -57,11 +67,6 @@ class UIManager {
                 this.toggleBuyMenu(false);
             });
         }
-
-        this.renderHeroSelector();
-        this.renderHeroesTab();
-        this.renderArsenalTab();
-        this.renderBuyMenu();
     }
 
     launchGameMode(mode) {
@@ -69,9 +74,9 @@ class UIManager {
         if (window.gameInstance) {
             window.gameInstance.startMatch(mode, this.selectedHero);
         }
-        // Show click to lock pointer prompt if not locked
         if (!document.pointerLockElement) {
-            document.getElementById('click-to-play-banner').classList.remove('hidden');
+            const promptBanner = document.getElementById('click-to-play-banner');
+            if (promptBanner) promptBanner.classList.remove('hidden');
         }
     }
 
@@ -91,12 +96,12 @@ class UIManager {
 
     renderHeroSelector() {
         const grid = document.getElementById('hero-selection-grid');
-        if (!grid) return;
+        if (!grid || !window.HEROES_DATA) return;
 
         grid.innerHTML = '';
         window.HEROES_DATA.forEach(hero => {
             const chip = document.createElement('div');
-            chip.className = `hero-chip ${hero.id === this.selectedHero.id ? 'active' : ''}`;
+            chip.className = `hero-chip ${this.selectedHero && hero.id === this.selectedHero.id ? 'active' : ''}`;
             chip.innerHTML = `
                 <div class="hero-chip-name">${hero.name}</div>
                 <div class="hero-chip-role">${hero.role.toUpperCase()}</div>
@@ -113,7 +118,7 @@ class UIManager {
     renderHeroesTab() {
         const sidebar = document.getElementById('hero-sidebar');
         const detail = document.getElementById('hero-detail-view');
-        if (!sidebar || !detail) return;
+        if (!sidebar || !detail || !window.HEROES_DATA) return;
 
         sidebar.innerHTML = '';
         window.HEROES_DATA.forEach((hero, index) => {
@@ -136,6 +141,7 @@ class UIManager {
     }
 
     showHeroDetails(hero, detailContainer) {
+        if (!hero || !detailContainer) return;
         detailContainer.innerHTML = `
             <div style="background:var(--bg-card); padding:30px; border-left:4px solid var(--accent-cyan);">
                 <span style="color:var(--accent-gold); font-family:var(--font-heading); font-size:0.9rem; letter-spacing:2px;">ROLE: ${hero.role.toUpperCase()}</span>
@@ -161,7 +167,7 @@ class UIManager {
 
     renderArsenalTab() {
         const container = document.getElementById('arsenal-view-container');
-        if (!container) return;
+        if (!container || !window.WEAPONS_DATA) return;
 
         container.innerHTML = `
             <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:20px;">
@@ -187,7 +193,7 @@ class UIManager {
 
     renderBuyMenu() {
         const grid = document.getElementById('buy-weapons-grid');
-        if (!grid) return;
+        if (!grid || !window.WEAPONS_DATA) return;
 
         grid.innerHTML = '';
         window.WEAPONS_DATA.forEach(w => {
@@ -215,18 +221,25 @@ class UIManager {
     }
 
     hideMainMenu() {
-        document.getElementById('main-menu').classList.add('hidden');
-        document.getElementById('game-hud').classList.remove('hidden');
+        const menu = document.getElementById('main-menu');
+        const hud = document.getElementById('game-hud');
+        if (menu) menu.classList.add('hidden');
+        if (hud) hud.classList.remove('hidden');
     }
 
     showMainMenu() {
-        document.getElementById('main-menu').classList.remove('hidden');
-        document.getElementById('game-hud').classList.add('hidden');
-        document.getElementById('click-to-play-banner').classList.add('hidden');
+        const menu = document.getElementById('main-menu');
+        const hud = document.getElementById('game-hud');
+        const promptBanner = document.getElementById('click-to-play-banner');
+
+        if (menu) menu.classList.remove('hidden');
+        if (hud) hud.classList.add('hidden');
+        if (promptBanner) promptBanner.classList.add('hidden');
     }
 
     toggleBuyMenu(show) {
         const buyMenu = document.getElementById('buy-menu');
+        if (!buyMenu) return;
         if (show) {
             buyMenu.classList.remove('hidden');
             if (window.gameInstance) {
@@ -239,6 +252,7 @@ class UIManager {
 
     toggleScoreboard(show) {
         const sb = document.getElementById('scoreboard');
+        if (!sb) return;
         if (show) {
             sb.classList.remove('hidden');
         } else {
@@ -262,4 +276,4 @@ class UIManager {
     }
 }
 
-window.uiManager = new UIManager();
+window.UIManager = UIManager;
