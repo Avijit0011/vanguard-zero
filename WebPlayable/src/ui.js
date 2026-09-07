@@ -46,16 +46,6 @@ class UIManager {
             });
         }
 
-        const btnLock = document.getElementById('btn-lock-pointer');
-        if (btnLock) {
-            btnLock.addEventListener('click', () => {
-                const promptBanner = document.getElementById('click-to-play-banner');
-                if (promptBanner) promptBanner.classList.add('hidden');
-                const canvas = document.getElementById('game-canvas');
-                if (canvas) canvas.requestPointerLock();
-            });
-        }
-
         // Settings Sensitivity slider
         const sensInput = document.getElementById('setting-sens');
         if (sensInput) {
@@ -82,9 +72,9 @@ class UIManager {
         if (window.gameInstance) {
             window.gameInstance.startMatch(mode, this.selectedHero);
         }
-        if (!document.pointerLockElement) {
-            const promptBanner = document.getElementById('click-to-play-banner');
-            if (promptBanner) promptBanner.classList.remove('hidden');
+        const canvas = document.getElementById('game-canvas');
+        if (canvas) {
+            canvas.requestPointerLock();
         }
     }
 
@@ -241,11 +231,9 @@ class UIManager {
         }
         const menu = document.getElementById('main-menu');
         const hud = document.getElementById('game-hud');
-        const promptBanner = document.getElementById('click-to-play-banner');
 
         if (menu) menu.classList.remove('hidden');
         if (hud) hud.classList.add('hidden');
-        if (promptBanner) promptBanner.classList.add('hidden');
     }
 
     toggleBuyMenu(show) {
