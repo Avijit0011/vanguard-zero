@@ -60,7 +60,7 @@ class VanguardGame {
         try {
             this.renderer.setSize(window.innerWidth, window.innerHeight);
             this.renderer.shadowMap.enabled = true;
-            this.scene.background = new THREE.Color(0x1a233a); // Bright sci-fi sky
+            this.scene.background = new THREE.Color(0x1a233a);
 
             // Hemisphere & Directional Lights
             const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444466, 0.8);
@@ -293,6 +293,12 @@ class VanguardGame {
     handleKeyDown(e) {
         this.keys[e.code] = true;
 
+        if (e.code === 'Escape') {
+            if (window.uiManager) {
+                window.uiManager.showMainMenu();
+            }
+        }
+
         if (e.code === 'Digit1') this.switchSlot(1);
         if (e.code === 'Digit2') this.switchSlot(2);
         if (e.code === 'Digit3') this.switchSlot(3);
@@ -436,7 +442,6 @@ class VanguardGame {
             }
         }
 
-        // Safe Tracer Creation
         this.createBulletTracer(muzzlePos, targetPos, 0x00f0ff);
 
         if (hitTarget && hitTarget.health > 0) {

@@ -38,6 +38,14 @@ class UIManager {
             });
         }
 
+        // Leave Match Button
+        const btnLeave = document.getElementById('btn-leave-match');
+        if (btnLeave) {
+            btnLeave.addEventListener('click', () => {
+                this.showMainMenu();
+            });
+        }
+
         const btnLock = document.getElementById('btn-lock-pointer');
         if (btnLock) {
             btnLock.addEventListener('click', () => {
@@ -228,6 +236,9 @@ class UIManager {
     }
 
     showMainMenu() {
+        if (document.pointerLockElement) {
+            document.exitPointerLock();
+        }
         const menu = document.getElementById('main-menu');
         const hud = document.getElementById('game-hud');
         const promptBanner = document.getElementById('click-to-play-banner');
