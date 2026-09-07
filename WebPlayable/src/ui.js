@@ -17,19 +17,27 @@ class UIManager {
         });
 
         // Mode Launchers
-        document.getElementById('btn-start-bot-match').addEventListener('click', () => {
-            this.hideMainMenu();
-            if (window.gameInstance) {
-                window.gameInstance.startMatch('5v5', this.selectedHero);
-            }
-        });
+        const btnBotMatch = document.getElementById('btn-start-bot-match');
+        if (btnBotMatch) {
+            btnBotMatch.addEventListener('click', () => {
+                this.launchGameMode('5v5');
+            });
+        }
 
-        document.getElementById('btn-start-range').addEventListener('click', () => {
-            this.hideMainMenu();
-            if (window.gameInstance) {
-                window.gameInstance.startMatch('range', this.selectedHero);
-            }
-        });
+        const btnRange = document.getElementById('btn-start-range');
+        if (btnRange) {
+            btnRange.addEventListener('click', () => {
+                this.launchGameMode('range');
+            });
+        }
+
+        const btnLock = document.getElementById('btn-lock-pointer');
+        if (btnLock) {
+            btnLock.addEventListener('click', () => {
+                document.getElementById('click-to-play-banner').classList.add('hidden');
+                document.getElementById('game-canvas').requestPointerLock();
+            });
+        }
 
         // Settings Sensitivity slider
         const sensInput = document.getElementById('setting-sens');
@@ -54,6 +62,17 @@ class UIManager {
         this.renderHeroesTab();
         this.renderArsenalTab();
         this.renderBuyMenu();
+    }
+
+    launchGameMode(mode) {
+        this.hideMainMenu();
+        if (window.gameInstance) {
+            window.gameInstance.startMatch(mode, this.selectedHero);
+        }
+        // Show click to lock pointer prompt if not locked
+        if (!document.pointerLockElement) {
+            document.getElementById('click-to-play-banner').classList.remove('hidden');
+        }
     }
 
     switchTab(tabName) {
@@ -203,6 +222,7 @@ class UIManager {
     showMainMenu() {
         document.getElementById('main-menu').classList.remove('hidden');
         document.getElementById('game-hud').classList.add('hidden');
+        document.getElementById('click-to-play-banner').classList.add('hidden');
     }
 
     toggleBuyMenu(show) {
