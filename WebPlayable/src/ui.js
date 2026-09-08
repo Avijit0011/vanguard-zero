@@ -265,6 +265,10 @@ class UIManager {
 
         const item = document.createElement('div');
         item.className = 'killfeed-item';
+        if (killer === 'YOU') {
+            item.style.borderColor = 'var(--accent-cyan)';
+            item.style.boxShadow = '0 0 10px rgba(0, 240, 255, 0.3)';
+        }
         item.innerHTML = `
             <span class="killer">${killer}</span>
             <span class="weapon-icon">[${weapon}]${isHeadshot ? ' 🎯' : ''}</span>
@@ -272,6 +276,73 @@ class UIManager {
         `;
         feed.appendChild(item);
         setTimeout(() => item.remove(), 4000);
+    }
+
+    showKillBanner(data) {
+        const { killer = 'YOU', weapon = 'AETHER V', victim = 'BOT', streakCount = 1, isHeadshot = false } = data;
+        const bannerContainer = document.getElementById('kill-banner-container');
+        const bannerInner = document.getElementById('kill-banner-inner');
+        const streakHeader = document.getElementById('kill-streak-header');
+        const weaponNameEl = document.getElementById('kill-weapon-name');
+        const victimNameEl = document.getElementById('kill-victim-name');
+        const headshotBadge = document.getElementById('kill-headshot-badge');
+        const skullDots = document.querySelectorAll('.skull-dot');
+        const aceOverlay = document.getElementById('ace-overlay');
+
+        if (!bannerContainer || !bannerInner) return;
+
+        if (this.killBannerTimeout) {
+            clearTimeout(this.killBannerTimeout);
+        }
+
+        const streakTitles = ['KILL', 'DOUBLE KILL', 'TRIPLE KILL', 'QUADRA KILL', 'ACE!'];
+        const streakIndex = Math.min(Math.max(streakCount, 1), 5);
+        const streakTitle = streakTitles[streakIndex - 1];
+
+        if (streakHeader) streakHeader.innerText = streakTitle;
+        if (weaponNameEl) weaponNameEl.innerText = weapon.toUpperCase();
+        if (victimNameEl) victimNameEl.innerText = victim.toUpperCase();
+
+        if (headshotBadge) {
+            if (isHeadshot) {
+                headshotBadge.classList.remove('hidden');
+            } else {
+                headshotBadge.classList.add('hidden');
+            }
+        }
+
+        bannerContainer.className = `kill-banner-container kill-tier-${streakIndex}`;
+
+        skullDots.forEach((dot) => {
+            const idx = parseInt(dot.getAttribute('data-index'), 10);
+            if (idx <= streakIndex) {
+                dot.classList.add('active');
+            } else {
+                dot.classList.remove('active');
+            }
+        });
+
+        bannerContainer.classList.remove('hidden');
+
+        bannerInner.style.animation = 'none';
+        bannerInner.offsetHeight; // trigger reflow
+        bannerInner.style.animation = 'killBannerPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+
+        if (streakIndex === 5 && aceOverlay) {
+            aceOverlay.classList.remove('hidden');
+            setTimeout(() => aceOverlay.classList.add('hidden'), 1200);
+        }
+
+        this.killBannerTimeout = setTimeout(() => {
+            bannerContainer.classList.add('hidden');
+        }, 3000);
+    }
+
+    resetKillBanner() {
+        const bannerContainer = document.getElementById('kill-banner-container');
+        if (bannerContainer) bannerContainer.classList.add('hidden');
+        const skullDots = document.querySelectorAll('.skull-dot');
+        skullDots.forEach(dot => dot.classList.remove('active'));
     }
 }
 

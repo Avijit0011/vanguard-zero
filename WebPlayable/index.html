@@ -27,6 +27,11 @@
                 <div class="ads-scope"></div>
             </div>
 
+            <!-- ACE CELEBRATION OVERLAY -->
+            <div id="ace-overlay" class="ace-overlay hidden">
+                <div class="ace-radiance-beam"></div>
+            </div>
+
             <!-- IN-GAME HUD -->
             <div id="game-hud" class="hidden">
                 <!-- TOP ROUND MATCH HEADER -->
@@ -72,6 +77,33 @@
 
                 <!-- KILLFEED -->
                 <div id="killfeed" class="killfeed-container"></div>
+
+                <!-- VALORANT-STYLE KILL BANNER (BOTTOM CENTER OVERLAY) -->
+                <div id="kill-banner-container" class="kill-banner-container hidden">
+                    <div class="kill-banner-inner" id="kill-banner-inner">
+                        <div class="kill-headshot-badge hidden" id="kill-headshot-badge">
+                            <span class="hs-icon">🎯</span> HEADSHOT
+                        </div>
+                        <div class="kill-streak-header" id="kill-streak-header">ELIMINATION</div>
+                        <div class="kill-emblem-wrapper">
+                            <div class="emblem-wings-left"></div>
+                            <div class="emblem-skull-icon" id="emblem-skull-icon">☠️</div>
+                            <div class="emblem-wings-right"></div>
+                        </div>
+                        <div class="kill-details-bar">
+                            <span class="kill-weapon-name" id="kill-weapon-name">AETHER V</span>
+                            <span class="kill-divider">|</span>
+                            <span class="kill-victim-name" id="kill-victim-name">BOT 1</span>
+                        </div>
+                        <div class="streak-skulls-bar" id="streak-skulls-bar">
+                            <span class="skull-dot" data-index="1">☠</span>
+                            <span class="skull-dot" data-index="2">☠</span>
+                            <span class="skull-dot" data-index="3">☠</span>
+                            <span class="skull-dot" data-index="4">☠</span>
+                            <span class="skull-dot" data-index="5">👑</span>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- BOTTOM CENTER PLAYER STATUS -->
                 <div class="hud-bottom-bar">

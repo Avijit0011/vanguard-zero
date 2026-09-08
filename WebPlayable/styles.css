@@ -721,3 +721,208 @@ body, html {
     padding: 8px 20px;
     cursor: pointer;
 }
+
+/* ==========================================================================
+   VALORANT-STYLE KILL BANNER & ACE OVERLAY STYLES
+   ========================================================================== */
+
+/* ACE OVERLAY CELEBRATION */
+.ace-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 95;
+    background: radial-gradient(circle at center, rgba(255, 183, 3, 0.25) 0%, rgba(255, 42, 95, 0.15) 50%, transparent 80%);
+    animation: aceRadiance 1.2s ease-out forwards;
+}
+
+@keyframes aceRadiance {
+    0% { opacity: 0; transform: scale(0.8); }
+    30% { opacity: 1; transform: scale(1.05); }
+    100% { opacity: 0; transform: scale(1); }
+}
+
+/* KILL BANNER CONTAINER */
+.kill-banner-container {
+    position: absolute;
+    bottom: 155px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.kill-banner-inner {
+    position: relative;
+    background: linear-gradient(180deg, rgba(16, 23, 42, 0.95) 0%, rgba(9, 13, 24, 0.98) 100%);
+    border: 2px solid var(--accent-cyan);
+    box-shadow: 0 0 25px rgba(0, 240, 255, 0.4), inset 0 0 15px rgba(0, 240, 255, 0.2);
+    clip-path: polygon(20px 0, 100% 0, calc(100% - 20px) 100%, 0 100%);
+    padding: 14px 45px 12px 45px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 280px;
+    backdrop-filter: blur(12px);
+    animation: killBannerPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes killBannerPop {
+    0% { opacity: 0; transform: translateY(20px) scale(0.75); }
+    70% { transform: translateY(-4px) scale(1.06); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* HEADSHOT BADGE */
+.kill-headshot-badge {
+    background: linear-gradient(90deg, rgba(255, 42, 95, 0.9), rgba(180, 0, 45, 0.9));
+    color: #ffffff;
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 2px;
+    padding: 3px 14px;
+    border-radius: 12px;
+    margin-bottom: 4px;
+    box-shadow: 0 0 12px rgba(255, 42, 95, 0.8);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    animation: headshotPop 0.3s ease-out;
+}
+
+@keyframes headshotPop {
+    0% { transform: scale(0.5); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* STREAK HEADER */
+.kill-streak-header {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    font-weight: 900;
+    letter-spacing: 3px;
+    color: var(--accent-cyan);
+    text-shadow: 0 0 12px var(--accent-cyan);
+    text-transform: uppercase;
+    line-height: 1.1;
+    margin-bottom: 2px;
+}
+
+/* EMBLEM SKULL & WINGS */
+.kill-emblem-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin: 4px 0;
+}
+
+.emblem-wings-left, .emblem-wings-right {
+    width: 35px;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--accent-cyan));
+    box-shadow: 0 0 8px var(--accent-cyan);
+}
+
+.emblem-wings-right {
+    background: linear-gradient(90deg, var(--accent-cyan), transparent);
+}
+
+.emblem-skull-icon {
+    font-size: 2.2rem;
+    line-height: 1;
+    filter: drop-shadow(0 0 10px var(--accent-cyan));
+    animation: skullPulse 1.5s infinite ease-in-out;
+}
+
+@keyframes skullPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.12); filter: drop-shadow(0 0 18px var(--accent-cyan)); }
+}
+
+/* KILL DETAILS BAR */
+.kill-details-bar {
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.kill-weapon-name {
+    color: #ffffff;
+}
+
+.kill-divider {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.kill-victim-name {
+    color: var(--accent-red);
+}
+
+/* STREAK SKULLS BAR */
+.streak-skulls-bar {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+    align-items: center;
+}
+
+.skull-dot {
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.2);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.skull-dot.active {
+    color: var(--accent-cyan);
+    text-shadow: 0 0 12px var(--accent-cyan);
+    transform: scale(1.35);
+}
+
+/* STREAK COLOR TIER STYLES */
+.kill-tier-1 .kill-banner-inner {
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 25px rgba(0, 240, 255, 0.5);
+}
+.kill-tier-1 .kill-streak-header { color: var(--accent-cyan); text-shadow: 0 0 12px var(--accent-cyan); }
+.kill-tier-1 .skull-dot.active { color: var(--accent-cyan); text-shadow: 0 0 12px var(--accent-cyan); }
+
+.kill-tier-2 .kill-banner-inner {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 30px rgba(0, 255, 135, 0.6);
+}
+.kill-tier-2 .kill-streak-header { color: var(--accent-green); text-shadow: 0 0 14px var(--accent-green); }
+.kill-tier-2 .skull-dot.active { color: var(--accent-green); text-shadow: 0 0 14px var(--accent-green); }
+
+.kill-tier-3 .kill-banner-inner {
+    border-color: #d946ef;
+    box-shadow: 0 0 35px rgba(217, 70, 239, 0.7);
+}
+.kill-tier-3 .kill-streak-header { color: #d946ef; text-shadow: 0 0 16px #d946ef; }
+.kill-tier-3 .skull-dot.active { color: #d946ef; text-shadow: 0 0 16px #d946ef; }
+
+.kill-tier-4 .kill-banner-inner {
+    border-color: var(--accent-red);
+    box-shadow: 0 0 40px rgba(255, 42, 95, 0.8);
+}
+.kill-tier-4 .kill-streak-header { color: var(--accent-red); text-shadow: 0 0 18px var(--accent-red); }
+.kill-tier-4 .skull-dot.active { color: var(--accent-red); text-shadow: 0 0 18px var(--accent-red); }
+
+.kill-tier-5 .kill-banner-inner {
+    border-color: var(--accent-gold);
+    background: linear-gradient(180deg, rgba(35, 25, 5, 0.98) 0%, rgba(15, 10, 2, 0.99) 100%);
+    box-shadow: 0 0 50px rgba(255, 183, 3, 0.95), inset 0 0 25px rgba(255, 183, 3, 0.4);
+}
+.kill-tier-5 .kill-streak-header { color: var(--accent-gold); text-shadow: 0 0 22px var(--accent-gold); font-size: 1.8rem; }
+.kill-tier-5 .skull-dot.active { color: var(--accent-gold); text-shadow: 0 0 20px var(--accent-gold); }
+

@@ -49,6 +49,10 @@ class VanguardGame {
         this.bots = [];
         this.tracers = [];
         this.particles = [];
+        this.killEffects = [];
+        this.deathPings = [];
+        this.killStreak = 0;
+        this.lastKillTime = 0;
 
         this.viewmodelOffset = new THREE.Vector3();
         this.viewmodelRot = new THREE.Vector3();
@@ -207,6 +211,9 @@ class VanguardGame {
     spawnBots() {
         this.bots.forEach(b => this.scene.remove(b.group));
         this.bots = [];
+        this.killStreak = 0;
+        this.lastKillTime = 0;
+        if (window.uiManager) window.uiManager.resetKillBanner();
 
         const enemyPositions = [
             new THREE.Vector3(0, 1.2, 25),
@@ -391,9 +398,7 @@ class VanguardGame {
                     targetBot.health -= 50;
                     this.createImpactSparks(hits[0].point, 0xff2a5f);
                     if (targetBot.health <= 0) {
-                        this.scene.remove(targetBot.group);
-                        if (window.uiManager) window.uiManager.addKillfeedEntry('YOU', 'PLASMA BLADE', targetBot.id, false);
-                        this.playerCredits += 200;
+                        this.onPlayerKill(targetBot, 'PLASMA BLADE', false);
                     }
                 }
             }
@@ -455,9 +460,7 @@ class VanguardGame {
             this.createImpactSparks(targetPos, 0xff2a5f);
 
             if (hitTarget.health <= 0) {
-                this.scene.remove(hitTarget.group);
-                if (window.uiManager) window.uiManager.addKillfeedEntry('YOU', this.equippedWeapon.name, hitTarget.id, isHeadshot);
-                this.playerCredits += 200;
+                this.onPlayerKill(hitTarget, this.equippedWeapon.name, isHeadshot);
             }
         } else {
             this.createImpactSparks(targetPos, 0xffb703);
@@ -503,6 +506,162 @@ class VanguardGame {
 
             this.scene.add(pMesh);
             this.particles.push({ mesh: pMesh, velocity: vel, life: 0.3 });
+        }
+    }
+
+    onPlayerKill(hitBot, weaponName, isHeadshot) {
+        const now = performance.now();
+        if (now - this.lastKillTime < 10000) {
+            this.killStreak = Math.min(this.killStreak + 1, 5);
+        } else {
+            this.killStreak = 1;
+        }
+        this.lastKillTime = now;
+
+        const deathPos = hitBot.pos.clone();
+        this.scene.remove(hitBot.group);
+
+        this.createKillEffect(deathPos, hitBot.colorHex || 0xff2a5f, isHeadshot, this.killStreak, hitBot.group);
+
+        this.deathPings.push({
+            pos: deathPos.clone(),
+            time: 2.5
+        });
+
+        if (window.soundEngine) {
+            window.soundEngine.playKillChime(this.killStreak, isHeadshot);
+        }
+
+        if (window.uiManager) {
+            window.uiManager.showKillBanner({
+                killer: 'YOU',
+                weapon: weaponName,
+                victim: hitBot.id,
+                streakCount: this.killStreak,
+                isHeadshot: isHeadshot
+            });
+            window.uiManager.addKillfeedEntry('YOU', weaponName, hitBot.id, isHeadshot);
+        }
+
+        this.viewmodelRot.x = -0.15;
+        this.viewmodelOffset.z = 0.12;
+
+        this.playerCredits += 200;
+    }
+
+    createKillEffect(pos, colorHex, isHeadshot, streakCount, originalGroup) {
+        // 1. Dissolving Emissive Ghost Body
+        if (originalGroup) {
+            const ghost = originalGroup.clone(true);
+            ghost.position.copy(originalGroup.position);
+            ghost.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = child.material.clone();
+                    child.material.transparent = true;
+                    child.material.emissive = new THREE.Color(streakCount === 5 ? 0xffb703 : colorHex);
+                    child.material.emissiveIntensity = 2.5;
+                    child.material.opacity = 0.95;
+                }
+            });
+            this.scene.add(ghost);
+            this.killEffects.push({
+                type: 'ghost',
+                mesh: ghost,
+                scaleSpeed: 1.2,
+                life: 0.35,
+                maxLife: 0.35
+            });
+        }
+
+        // 2. Ground Shockwave Ring
+        const ringGeo = new THREE.RingGeometry(0.3, 0.6, 32);
+        ringGeo.rotateX(-Math.PI / 2);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: streakCount === 5 ? 0xffb703 : (isHeadshot ? 0xff2a5f : colorHex),
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.9
+        });
+        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+        ringMesh.position.copy(pos).add(new THREE.Vector3(0, 0.05, 0));
+        this.scene.add(ringMesh);
+
+        this.killEffects.push({
+            type: 'ring',
+            mesh: ringMesh,
+            maxScale: 6.5,
+            life: 0.75,
+            maxLife: 0.75
+        });
+
+        // 3. Vertical Energy Light Pillar
+        const pillarGeo = new THREE.CylinderGeometry(0.4, 0.9, 5.0, 16);
+        const pillarMat = new THREE.MeshBasicMaterial({
+            color: streakCount === 5 ? 0xffb703 : colorHex,
+            transparent: true,
+            opacity: 0.75,
+            side: THREE.DoubleSide
+        });
+        const pillarMesh = new THREE.Mesh(pillarGeo, pillarMat);
+        pillarMesh.position.copy(pos).add(new THREE.Vector3(0, 2.5, 0));
+        this.scene.add(pillarMesh);
+
+        this.killEffects.push({
+            type: 'pillar',
+            mesh: pillarMesh,
+            life: 0.5,
+            maxLife: 0.5
+        });
+
+        // 4. Floating 3D Holographic Crest Ring
+        const crestGeo = new THREE.TorusGeometry(0.65, 0.06, 12, 32);
+        crestGeo.rotateX(Math.PI / 2);
+        const crestMat = new THREE.MeshBasicMaterial({
+            color: streakCount === 5 ? 0xffb703 : (isHeadshot ? 0xff2a5f : 0x00f0ff),
+            transparent: true,
+            opacity: 0.95
+        });
+        const crestMesh = new THREE.Mesh(crestGeo, crestMat);
+        crestMesh.position.copy(pos).add(new THREE.Vector3(0, 1.8, 0));
+        this.scene.add(crestMesh);
+
+        this.killEffects.push({
+            type: 'crest',
+            mesh: crestMesh,
+            rotSpeed: 4.5,
+            riseSpeed: 1.8,
+            life: 1.0,
+            maxLife: 1.0
+        });
+
+        // 5. Rising Spark Embers
+        for (let i = 0; i < 28; i++) {
+            const pGeo = new THREE.BufferGeometry();
+            const pMat = new THREE.PointsMaterial({
+                color: isHeadshot ? 0xff2a5f : (streakCount === 5 ? 0xffb703 : colorHex),
+                size: 0.12,
+                transparent: true,
+                opacity: 1
+            });
+            const pMesh = new THREE.Points(pGeo, pMat);
+            pMesh.position.copy(pos).add(new THREE.Vector3(
+                (Math.random() - 0.5) * 0.8,
+                Math.random() * 1.5,
+                (Math.random() - 0.5) * 0.8
+            ));
+
+            const vel = new THREE.Vector3(
+                (Math.random() - 0.5) * 6,
+                Math.random() * 7 + 2,
+                (Math.random() - 0.5) * 6
+            );
+
+            this.scene.add(pMesh);
+            this.particles.push({
+                mesh: pMesh,
+                velocity: vel,
+                life: Math.random() * 0.6 + 0.4
+            });
         }
     }
 
@@ -646,6 +805,48 @@ class VanguardGame {
             if (p.life <= 0) {
                 this.scene.remove(p.mesh);
                 this.particles.splice(i, 1);
+            }
+        }
+
+        // Update Kill FX
+        for (let i = this.killEffects.length - 1; i >= 0; i--) {
+            const fx = this.killEffects[i];
+            fx.life -= delta;
+
+            if (fx.life <= 0) {
+                this.scene.remove(fx.mesh);
+                this.killEffects.splice(i, 1);
+                continue;
+            }
+
+            const progress = 1 - (fx.life / fx.maxLife);
+
+            if (fx.type === 'ghost') {
+                fx.mesh.scale.addScalar(fx.scaleSpeed * delta);
+                fx.mesh.traverse(child => {
+                    if (child.isMesh && child.material) {
+                        child.material.opacity = (fx.life / fx.maxLife) * 0.95;
+                    }
+                });
+            } else if (fx.type === 'ring') {
+                const s = 1 + progress * (fx.maxScale - 1);
+                fx.mesh.scale.set(s, 1, s);
+                fx.mesh.material.opacity = (1 - progress) * 0.9;
+            } else if (fx.type === 'pillar') {
+                fx.mesh.scale.set(1 + progress * 0.5, 1 + progress * 0.2, 1 + progress * 0.5);
+                fx.mesh.material.opacity = (1 - progress) * 0.75;
+            } else if (fx.type === 'crest') {
+                fx.mesh.rotation.z += fx.rotSpeed * delta;
+                fx.mesh.position.y += fx.riseSpeed * delta;
+                fx.mesh.material.opacity = (1 - progress) * 0.95;
+            }
+        }
+
+        // Update Death Pings for Minimap
+        for (let i = this.deathPings.length - 1; i >= 0; i--) {
+            this.deathPings[i].time -= delta;
+            if (this.deathPings[i].time <= 0) {
+                this.deathPings.splice(i, 1);
             }
         }
     }
@@ -799,6 +1000,23 @@ class VanguardGame {
                 ctx.arc(bx, bz, 4, 0, Math.PI * 2);
                 ctx.fill();
             }
+        });
+
+        // Minimap Death Markers Pings
+        this.deathPings.forEach(dp => {
+            const dx = 80 + (dp.pos.x * 0.8);
+            const dz = 80 + (dp.pos.z * 0.8);
+            const alpha = Math.min(1, dp.time / 1.0);
+
+            ctx.strokeStyle = `rgba(255, 42, 95, ${alpha})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(dx, dz, Math.max(3, 8 + (2.5 - dp.time) * 4), 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.fillStyle = `rgba(255, 42, 95, ${alpha})`;
+            ctx.font = '10px Orbitron, sans-serif';
+            ctx.fillText('☠', dx - 4, dz + 3);
         });
 
         // Player Dot
