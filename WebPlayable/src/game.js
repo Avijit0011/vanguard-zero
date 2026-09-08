@@ -215,17 +215,30 @@ class VanguardGame {
         this.lastKillTime = 0;
         if (window.uiManager) window.uiManager.resetKillBanner();
 
-        const enemyPositions = [
-            new THREE.Vector3(0, 1.2, 25),
-            new THREE.Vector3(-12, 1.2, 20),
-            new THREE.Vector3(12, 1.2, 20),
-            new THREE.Vector3(0, 1.2, -5),
-            new THREE.Vector3(-35, 1.2, -30),
-            new THREE.Vector3(35, 1.2, -30)
+        const enemyDefs = [
+            // Site A Defenders & Perches
+            { id: 'ENEMY_BOT_1', role: 'ASSAULT', hp: 100, armor: 50, colorHex: 0xff2a5f, pos: new THREE.Vector3(0, 1.2, 25) },
+            { id: 'ENEMY_BOT_2', role: 'SNIPER', hp: 80, armor: 25, colorHex: 0xdb2777, pos: new THREE.Vector3(-12, 2.5, 20) },
+            { id: 'ENEMY_BOT_3', role: 'JUGGERNAUT', hp: 200, armor: 100, colorHex: 0x991b1b, pos: new THREE.Vector3(12, 1.2, 20) },
+            { id: 'ENEMY_BOT_4', role: 'ASSAULT', hp: 100, armor: 50, colorHex: 0xff2a5f, pos: new THREE.Vector3(-28, 1.2, 35) },
+            
+            // Mid Lane & Chokepoints
+            { id: 'ENEMY_BOT_5', role: 'ASSAULT', hp: 100, armor: 50, colorHex: 0xff2a5f, pos: new THREE.Vector3(0, 1.2, -5) },
+            { id: 'ENEMY_BOT_6', role: 'ASSAULT', hp: 100, armor: 50, colorHex: 0xff2a5f, pos: new THREE.Vector3(-18, 1.2, 5) },
+            { id: 'ENEMY_BOT_7', role: 'SNIPER', hp: 80, armor: 25, colorHex: 0xdb2777, pos: new THREE.Vector3(18, 2.5, -10) },
+
+            // Site B Defenders
+            { id: 'ENEMY_BOT_8', role: 'JUGGERNAUT', hp: 200, armor: 100, colorHex: 0x991b1b, pos: new THREE.Vector3(-35, 1.2, -30) },
+            { id: 'ENEMY_BOT_9', role: 'ASSAULT', hp: 100, armor: 50, colorHex: 0xff2a5f, pos: new THREE.Vector3(35, 1.2, -30) },
+            { id: 'ENEMY_BOT_10', role: 'ASSAULT', hp: 100, armor: 50, colorHex: 0xff2a5f, pos: new THREE.Vector3(-25, 1.2, -20) },
+            { id: 'ENEMY_BOT_11', role: 'SNIPER', hp: 80, armor: 25, colorHex: 0xdb2777, pos: new THREE.Vector3(25, 2.8, -25) },
+
+            // Defender Spawn & Flank Guards
+            { id: 'ENEMY_BOT_12', role: 'JUGGERNAUT', hp: 200, armor: 100, colorHex: 0x991b1b, pos: new THREE.Vector3(0, 1.2, -45) }
         ];
 
-        enemyPositions.forEach((pos, idx) => {
-            this.createBotEntity(`ENEMY_BOT_${idx + 1}`, 'Red', 0xff2a5f, pos);
+        enemyDefs.forEach((def) => {
+            this.createBotEntity(def.id, 'Red', def.role, def.colorHex, def.pos, def.hp, def.armor);
         });
 
         const allyPositions = [
@@ -236,38 +249,62 @@ class VanguardGame {
         ];
 
         allyPositions.forEach((pos, idx) => {
-            this.createBotEntity(`ALLY_BOT_${idx + 1}`, 'Cyan', 0x00f0ff, pos);
+            this.createBotEntity(`ALLY_BOT_${idx + 1}`, 'Cyan', 'ASSAULT', 0x00f0ff, pos, 100, 50);
         });
     }
 
-    createBotEntity(id, team, colorHex, pos) {
+    createBotEntity(id, team, role = 'ASSAULT', colorHex = 0xff2a5f, pos, maxHp = 100, maxArmor = 50) {
         const botGroup = new THREE.Group();
 
-        const bodyGeo = new THREE.CapsuleGeometry(0.5, 1.2, 8, 16);
+        // 1. Capsule Body
+        const bodyGeo = new THREE.CapsuleGeometry(role === 'JUGGERNAUT' ? 0.65 : 0.5, 1.2, 8, 16);
         const bodyMat = new THREE.MeshStandardMaterial({
             color: colorHex,
             roughness: 0.3,
             emissive: colorHex,
-            emissiveIntensity: 0.3
+            emissiveIntensity: 0.35
         });
         const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
         botGroup.add(bodyMesh);
 
-        const headGeo = new THREE.SphereGeometry(0.35, 16, 16);
-        const visorMat = new THREE.MeshStandardMaterial({ color: 0xffb703, emissive: 0xffb703, emissiveIntensity: 0.8 });
+        // 2. Head & Visor
+        const headGeo = new THREE.SphereGeometry(role === 'JUGGERNAUT' ? 0.4 : 0.35, 16, 16);
+        const visorMat = new THREE.MeshStandardMaterial({
+            color: role === 'SNIPER' ? 0xec4899 : 0xffb703,
+            emissive: role === 'SNIPER' ? 0xec4899 : 0xffb703,
+            emissiveIntensity: 0.9
+        });
         const headMesh = new THREE.Mesh(headGeo, visorMat);
         headMesh.position.set(0, 0.8, 0.1);
         botGroup.add(headMesh);
 
-        const weaponGeo = new THREE.BoxGeometry(0.12, 0.12, 0.65);
+        // 3. Juggernaut Heavy Shoulder Armor Pads
+        if (role === 'JUGGERNAUT') {
+            const padGeo = new THREE.BoxGeometry(0.35, 0.35, 0.45);
+            const padMat = new THREE.MeshStandardMaterial({ color: 0x450a0a, metalness: 0.9 });
+            const leftPad = new THREE.Mesh(padGeo, padMat);
+            leftPad.position.set(-0.65, 0.5, 0);
+            const rightPad = new THREE.Mesh(padGeo, padMat);
+            rightPad.position.set(0.65, 0.5, 0);
+            botGroup.add(leftPad);
+            botGroup.add(rightPad);
+        }
+
+        // 4. Weapon Mesh
+        const weaponGeo = new THREE.BoxGeometry(0.12, 0.12, role === 'SNIPER' ? 0.95 : 0.65);
         const weaponMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 });
         const weaponMesh = new THREE.Mesh(weaponGeo, weaponMat);
         weaponMesh.position.set(0.32, 0.2, -0.3);
         botGroup.add(weaponMesh);
 
+        // 5. Point Light Aura
         const botLight = new THREE.PointLight(colorHex, 1.5, 8);
         botLight.position.set(0, 1.2, 0);
         botGroup.add(botLight);
+
+        // 6. Floating Overhead 3D Health Bar Canvas Sprite
+        const hpInfo = this.createBotHealthBar(id, role, maxHp, maxHp, maxArmor, colorHex);
+        botGroup.add(hpInfo.sprite);
 
         botGroup.position.copy(pos);
         this.scene.add(botGroup);
@@ -275,14 +312,94 @@ class VanguardGame {
         this.bots.push({
             id,
             team,
+            role,
             colorHex,
             group: botGroup,
             hitMesh: bodyMesh,
-            health: 100,
-            armor: 50,
+            health: maxHp,
+            maxHealth: maxHp,
+            armor: maxArmor,
             pos: botGroup.position,
+            basePos: pos.clone(),
+            strafeSeed: Math.random() * 100,
+            hpInfo: hpInfo,
             lastShotTime: 0
         });
+    }
+
+    createBotHealthBar(id, role, health, maxHealth, armor, colorHex) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.minFilter = THREE.LinearFilter;
+        const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.scale.set(1.8, 0.45, 1);
+        sprite.position.set(0, 1.85, 0);
+
+        this.drawHealthBarCanvas(canvas, ctx, texture, id, role, health, maxHealth, armor, colorHex);
+
+        return { sprite, canvas, ctx, texture };
+    }
+
+    drawHealthBarCanvas(canvas, ctx, texture, id, role, health, maxHealth, armor, colorHex) {
+        ctx.clearRect(0, 0, 256, 64);
+
+        ctx.fillStyle = 'rgba(10, 15, 25, 0.88)';
+        ctx.fillRect(0, 0, 256, 64);
+        ctx.strokeStyle = colorHex === 0x00f0ff ? '#00f0ff' : '#ff2a5f';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(1, 1, 254, 62);
+
+        ctx.font = 'bold 15px Orbitron, sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(`${id}`, 10, 22);
+
+        ctx.font = 'bold 12px Rajdhani, sans-serif';
+        ctx.fillStyle = colorHex === 0x00f0ff ? '#00f0ff' : '#ffb703';
+        ctx.fillText(`[${role}]`, 140, 22);
+
+        if (armor > 0) {
+            ctx.font = '13px Rajdhani, sans-serif';
+            ctx.fillStyle = '#00f0ff';
+            ctx.fillText(`🛡️${armor}`, 205, 22);
+        }
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.fillRect(10, 32, 236, 20);
+
+        const pct = Math.max(0, health / maxHealth);
+        let fillColor = '#00ff87';
+        if (pct < 0.35) fillColor = '#ff2a5f';
+        else if (pct < 0.65) fillColor = '#ffb703';
+
+        ctx.fillStyle = fillColor;
+        ctx.fillRect(10, 32, 236 * pct, 20);
+
+        ctx.font = 'bold 13px Rajdhani, sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(`${Math.max(0, health)} / ${maxHealth}`, 95, 47);
+
+        texture.needsUpdate = true;
+    }
+
+    updateBotHealthBar(bot) {
+        if (bot && bot.hpInfo) {
+            this.drawHealthBarCanvas(
+                bot.hpInfo.canvas,
+                bot.hpInfo.ctx,
+                bot.hpInfo.texture,
+                bot.id,
+                bot.role || 'ASSAULT',
+                bot.health,
+                bot.maxHealth || 100,
+                bot.armor || 0,
+                bot.colorHex
+            );
+        }
     }
 
     handleMouseMove(e) {
@@ -452,6 +569,7 @@ class VanguardGame {
         if (hitTarget && hitTarget.health > 0) {
             const damage = isHeadshot ? Math.round(this.equippedWeapon.damage * this.equippedWeapon.headshotMult) : this.equippedWeapon.damage;
             hitTarget.health -= damage;
+            this.updateBotHealthBar(hitTarget);
 
             if (isHeadshot && window.soundEngine) {
                 window.soundEngine.playHeadshotPing();
@@ -720,27 +838,43 @@ class VanguardGame {
         const cyanBots = this.bots.filter(b => b.team === 'Cyan' && b.health > 0);
 
         redBots.forEach(bot => {
+            // 1. Billboard 3D Overhead Health Bar to Camera
+            if (bot.hpInfo && bot.hpInfo.sprite) {
+                bot.hpInfo.sprite.lookAt(this.camera.position);
+            }
+
+            // 2. Tactical Side-to-Side Strafe Movement
+            if (bot.basePos) {
+                const strafeAmount = bot.role === 'SNIPER' ? 0.4 : (bot.role === 'JUGGERNAUT' ? 0.6 : 1.8);
+                const strafeX = Math.sin(timestamp * 0.0025 + bot.strafeSeed) * strafeAmount;
+                bot.group.position.x = bot.basePos.x + strafeX;
+            }
+
             const distToPlayer = bot.pos.distanceTo(this.playerPos);
 
-            if (distToPlayer < 40) {
+            if (distToPlayer < 50) {
                 const targetLook = new THREE.Vector3(this.playerPos.x, bot.pos.y, this.playerPos.z);
                 if (bot.pos.distanceTo(targetLook) > 0.1) {
                     bot.group.lookAt(targetLook);
                 }
 
-                if (timestamp - bot.lastShotTime > 1200) {
+                const shotCooldown = bot.role === 'SNIPER' ? 1800 : (bot.role === 'JUGGERNAUT' ? 700 : 1200);
+
+                if (timestamp - bot.lastShotTime > shotCooldown) {
                     bot.lastShotTime = timestamp;
 
                     const botMuzzle = bot.pos.clone().add(new THREE.Vector3(0, 0.4, 0));
-                    this.createBulletTracer(botMuzzle, this.playerPos.clone().add(new THREE.Vector3(0, -0.3, 0)), 0xff2a5f);
+                    const tracerColor = bot.role === 'SNIPER' ? 0xdb2777 : 0xff2a5f;
+                    this.createBulletTracer(botMuzzle, this.playerPos.clone().add(new THREE.Vector3(0, -0.3, 0)), tracerColor);
 
-                    if (window.soundEngine) window.soundEngine.playGunshot('rifle');
+                    if (window.soundEngine) window.soundEngine.playGunshot(bot.role === 'SNIPER' ? 'sniper' : 'rifle');
 
-                    if (distToPlayer < 30 && Math.random() < 0.35) {
-                        this.health = Math.max(0, this.health - 12);
+                    if (distToPlayer < 40 && Math.random() < (bot.role === 'SNIPER' ? 0.5 : 0.3)) {
+                        const botDamage = bot.role === 'SNIPER' ? 25 : (bot.role === 'JUGGERNAUT' ? 8 : 12);
+                        this.health = Math.max(0, this.health - botDamage);
                         this.updateHUD();
                         if (this.health <= 0 && window.uiManager) {
-                            window.uiManager.addKillfeedEntry(bot.id, 'AETHER V', 'YOU', false);
+                            window.uiManager.addKillfeedEntry(bot.id, bot.role === 'SNIPER' ? 'APEX-9' : 'AETHER V', 'YOU', false);
                         }
                     }
                 }
@@ -756,6 +890,7 @@ class VanguardGame {
                     const botMuzzle = bot.pos.clone().add(new THREE.Vector3(0, 0.4, 0));
                     this.createBulletTracer(botMuzzle, targetAlly.pos, 0xff2a5f);
                     targetAlly.health -= 25;
+                    this.updateBotHealthBar(targetAlly);
                     if (targetAlly.health <= 0) {
                         this.scene.remove(targetAlly.group);
                         if (window.uiManager) window.uiManager.addKillfeedEntry(bot.id, 'AETHER V', targetAlly.id, false);
@@ -765,6 +900,10 @@ class VanguardGame {
         });
 
         cyanBots.forEach(bot => {
+            if (bot.hpInfo && bot.hpInfo.sprite) {
+                bot.hpInfo.sprite.lookAt(this.camera.position);
+            }
+
             if (redBots.length > 0) {
                 const targetRed = redBots[0];
                 const targetLook = new THREE.Vector3(targetRed.pos.x, bot.pos.y, targetRed.pos.z);
@@ -777,6 +916,7 @@ class VanguardGame {
                     const botMuzzle = bot.pos.clone().add(new THREE.Vector3(0, 0.4, 0));
                     this.createBulletTracer(botMuzzle, targetRed.pos, 0x00f0ff);
                     targetRed.health -= 30;
+                    this.updateBotHealthBar(targetRed);
                     if (targetRed.health <= 0) {
                         this.scene.remove(targetRed.group);
                         if (window.uiManager) window.uiManager.addKillfeedEntry(bot.id, 'AETHER V', targetRed.id, false);
